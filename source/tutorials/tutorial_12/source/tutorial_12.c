@@ -31,17 +31,30 @@
 #include "task.h"
 #include "semphr.h"
 
+#define MAX_COUNT 100
 /**
  * @brief Functions that implement FreeRTOS tasks.
  */
 static void prvTask1( void * pvParams );
 static void prvTask2( void * pvParams );
+
+static void prvEvenTask( void * pvParams );
+static void prvOddTask( void * pvParams );
 /*-----------------------------------------------------------*/
 
 /**
  * @brief Semaphore used in this program.
  */
+static SemaphoreHandle_t xSemaphore_even = NULL;
+static SemaphoreHandle_t xSemaphore_odd = NULL;
+
 static SemaphoreHandle_t xSemaphore = NULL;
+
+/**
+ * @brief Global variable used
+ */
+int volatile count = 1;
+
 /*-----------------------------------------------------------*/
 
 /**
@@ -51,30 +64,40 @@ int main( void )
 {
     BaseType_t xTaskCreationResult = pdFAIL;
 
-    xTaskCreationResult = xTaskCreate( prvTask1,
-                                       "Task1",
-                                       configMINIMAL_STACK_SIZE,
-                                       NULL,
-                                       tskIDLE_PRIORITY + 1,
-                                       NULL );
-    configASSERT( xTaskCreationResult == pdPASS );
-
-    xTaskCreationResult = xTaskCreate( prvTask2,
-                                       "Task2",
-                                       configMINIMAL_STACK_SIZE,
-                                       NULL,
-                                       tskIDLE_PRIORITY,
-                                       NULL );
-    configASSERT( xTaskCreationResult == pdPASS );
-
-    /*
+     /*
      * TODO 1 - Create a binary semaphore using xSemaphoreCreateBinary API.
      *
      * Assign the return value to xSemaphore.
      */
+    xSemaphore_even = xSemaphoreCreateBinary();
+    configASSERT( xSemaphore_even != NULL );
+    xSemaphore_odd = xSemaphoreCreateBinary();
+    configASSERT( xSemaphore_odd != NULL );
+    
+    if ((xSemaphore_even != NULL) && (xSemaphore_odd != NULL))
+    {
+        xTaskCreationResult = xTaskCreate( prvEvenTask,
+                                        "Printing even numbers",
+                                        configMINIMAL_STACK_SIZE,
+                                        NULL,
+                                        tskIDLE_PRIORITY + 1,
+                                        NULL );
+        configASSERT( xTaskCreationResult == pdPASS );
 
-    configASSERT( xSemaphore != NULL );
-
+        xTaskCreationResult = xTaskCreate( prvOddTask,
+                                        "Printing odd numbers",
+                                        configMINIMAL_STACK_SIZE,
+                                        NULL,
+                                        tskIDLE_PRIORITY,
+                                        NULL );
+        configASSERT( xTaskCreationResult == pdPASS );
+    }
+   
+#if 0
+    xSemaphore = xSemaphoreCreateBinary();
+    configASSERT( xSemaphore != NULL);
+#endif
+    xSemaphoreGive(xSemaphore_odd);
     /* Start the scheduler. */
     vTaskStartScheduler();
 
@@ -88,7 +111,7 @@ int main( void )
     return 0;
 }
 /*-----------------------------------------------------------*/
-
+#if 0
 static void prvTask1( void * pvParams )
 {
     /* Silence warning about unused parameters. */
@@ -103,8 +126,8 @@ static void prvTask1( void * pvParams )
          * xSemaphore   xSemaphore
          * xBlockTime   portMAX_DELAY
          */
-
-        fprintf( stderr, "Task 1 is running...\r\n" );
+        xSemaphoreTake(xSemaphore, portMAX_DELAY);
+        fprintf( stdout, "Task 1 is running...\r\n" );
     }
 
 }
@@ -129,12 +152,44 @@ static void prvTask2( void * pvParams )
          *
          * Assign the return value to xSemaphoreGiveResult.
          */
-
+        xSemaphoreGiveResult = xSemaphoreGive(xSemaphore);
         configASSERT( xSemaphoreGiveResult == pdPASS );
 
-        fprintf( stderr, "Task 2 is running...\r\n" );
+        fprintf(stdout, "Task 2 is running...\r\n" );
 
         vTaskDelay( pdMS_TO_TICKS( 1000 ) );
     }
 }
+#endif
+
+static void prvOddTask( void* pvParams)
+{
+    (void)pvParams;
+
+    for(;;)
+    {
+        xSemaphoreTake(xSemaphore_odd, portMAX_DELAY);
+        if (count >= MAX_COUNT) break;
+        fprintf(stdout, "%d ", count++);
+        fflush(stdout);
+        xSemaphoreGive(xSemaphore_even);
+    }
+    vTaskDelete(NULL);
+}
+
+static void prvEvenTask( void* pvParams)
+{
+    (void)pvParams;
+
+    for(;;)
+    {
+        xSemaphoreTake(xSemaphore_even, portMAX_DELAY);
+        if (count >= MAX_COUNT) break;
+        fprintf(stdout, "%d ", count++);
+        fflush(stdout);
+        xSemaphoreGive(xSemaphore_odd);
+    }
+    vTaskDelete(NULL);
+}
+
 /*-----------------------------------------------------------*/
