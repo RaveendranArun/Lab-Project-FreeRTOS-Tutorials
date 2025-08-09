@@ -170,8 +170,9 @@ static void prvOddTask( void* pvParams)
     {
         xSemaphoreTake(xSemaphore_odd, portMAX_DELAY);
         if (count >= MAX_COUNT) break;
-        fprintf(stdout, "%d ", count++);
+        fprintf(stdout, "Odd Task:  %d\n", count++);
         fflush(stdout);
+        vTaskDelay(pdMS_TO_TICKS(1000));
         xSemaphoreGive(xSemaphore_even);
     }
     vTaskDelete(NULL);
@@ -185,8 +186,9 @@ static void prvEvenTask( void* pvParams)
     {
         xSemaphoreTake(xSemaphore_even, portMAX_DELAY);
         if (count >= MAX_COUNT) break;
-        fprintf(stdout, "%d ", count++);
+        fprintf(stdout, "Even Task: %d\n", count++);
         fflush(stdout);
+        vTaskDelay(pdMS_TO_TICKS(1000));
         xSemaphoreGive(xSemaphore_odd);
     }
     vTaskDelete(NULL);
