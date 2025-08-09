@@ -31,18 +31,25 @@
 #include "task.h"
 #include "semphr.h"
 
+#define MAX_COUNT 100
+
 /**
  * @brief Functions that implement FreeRTOS tasks.
  */
 static void prvTask1( void * pvParams );
 static void prvTask2( void * pvParams );
+
+static void prvEvenTask( void * pvParams );
+static void prvOddTask( void * pvParams );
 /*-----------------------------------------------------------*/
 
 /**
  * @brief Mutex used in this program.
  */
 static SemaphoreHandle_t xMutex = NULL;
+
 /*-----------------------------------------------------------*/
+static volatile int count = 1;
 
 /**
  * @brief Tutorial entry point.
@@ -51,29 +58,35 @@ int main( void )
 {
     BaseType_t xTaskCreationResult = pdFAIL;
 
-    xTaskCreationResult = xTaskCreate( prvTask1,
-                                       "Task1",
-                                       configMINIMAL_STACK_SIZE,
-                                       NULL,
-                                       tskIDLE_PRIORITY,
-                                       NULL );
-    configASSERT( xTaskCreationResult == pdPASS );
+    xMutex = xSemaphoreCreateMutex();
+    configASSERT( xMutex != NULL );
+    if (xMutex != NULL)
+    {
+        xTaskCreationResult = xTaskCreate( prvEvenTask,
+                                        "Task1",
+                                        configMINIMAL_STACK_SIZE,
+                                        NULL,
+                                        tskIDLE_PRIORITY,
+                                        NULL );
+        configASSERT( xTaskCreationResult == pdPASS );
 
-    xTaskCreationResult = xTaskCreate( prvTask2,
-                                       "Task2",
-                                       configMINIMAL_STACK_SIZE,
-                                       NULL,
-                                       tskIDLE_PRIORITY,
-                                       NULL );
-    configASSERT( xTaskCreationResult == pdPASS );
-
+        xTaskCreationResult = xTaskCreate( prvOddTask,
+                                        "Task2",
+                                        configMINIMAL_STACK_SIZE,
+                                        NULL,
+                                        tskIDLE_PRIORITY,
+                                        NULL );
+        configASSERT( xTaskCreationResult == pdPASS );
+     }
+#if 0
     /*
      * TODO 1 - Create a mutex using xSemaphoreCreateMutex API.
      *
      * Assign the return value to xMutex.
      */
-
+    xMutex = xSemaphoreCreateMutex();
     configASSERT( xMutex != NULL );
+#endif
 
     /* Start the scheduler. */
     vTaskStartScheduler();
@@ -105,7 +118,7 @@ static void prvTask1( void * pvParams )
          * xSemaphore   xMutex
          * xBlockTime   portMAX_DELAY
          */
-
+        xSemaphoreTake(xMutex, portMAX_DELAY);
         {
             fprintf( stderr, "Task 1 is running...\r\n" );
         }
@@ -117,7 +130,7 @@ static void prvTask1( void * pvParams )
          *
          * Assign the return value to xSemaphoreGiveResult.
          */
-
+        xSemaphoreGiveResult=  xSemaphoreGive(xMutex);
         configASSERT( xSemaphoreGiveResult == pdPASS );
 
         vTaskDelay( pdMS_TO_TICKS( 1000 ) );
@@ -142,7 +155,7 @@ static void prvTask2( void * pvParams )
          * xSemaphore   xMutex
          * xBlockTime   portMAX_DELAY
          */
-
+        xSemaphoreTake(xMutex, portMAX_DELAY);
         {
             fprintf( stderr, "Task 2 is running...\r\n" );
         }
@@ -154,10 +167,54 @@ static void prvTask2( void * pvParams )
          *
          * Assign the return value to xSemaphoreGiveResult.
          */
-
+        xSemaphoreGiveResult = xSemaphoreGive(xMutex);
         configASSERT( xSemaphoreGiveResult == pdPASS );
 
         vTaskDelay( pdMS_TO_TICKS( 1000 ) );
     }
+}
+
+static void prvEvenTask( void * pvParams )
+{
+    (void)pvParams;
+
+    for(;;)
+    {
+        // Lock the mutex
+        xSemaphoreTake(xMutex, portMAX_DELAY);
+        if (!(count & 1) && (count <= MAX_COUNT))
+        {
+            fprintf(stdout, "Even Task: %d\n", count++);
+            fflush(stdout);
+        }
+        // Unlock mutex
+        xSemaphoreGive(xMutex);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        taskYIELD(); // Let the other task run
+    }
+
+    vTaskDelete(NULL);
+}
+
+static void prvOddTask(void* pvParams)
+{
+    (void)pvParams;
+
+    for(;;)
+    {
+        // Lock the mutex
+        xSemaphoreTake(xMutex, portMAX_DELAY);
+        if ((count & 1) && (count <= MAX_COUNT))
+        {
+            fprintf(stdout, "Odd Task:  %d\n", count++);
+            fflush(stdout);
+        }
+        // Unlock mutex
+        xSemaphoreGive(xMutex);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        taskYIELD(); // Let the other task run
+    }
+
+    vTaskDelete(NULL);
 }
 /*-----------------------------------------------------------*/
